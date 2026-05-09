@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Express Live Dev Test</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <h1>Express Live Dev</h1>
+  <p>If you see this, hot reloading is working! It was just reloaded!</p>
+  <div id="api-response">Loading API...</div>
+  <script>
+    fetch('/api/message')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('api-response').innerText = data.message;
+      });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,32 @@
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #000000;
+    color: #ededed;
+}
+.bg-gradient-radial {
+    background-image: radial-gradient(circle at top center, rgba(59, 130, 246, 0.15), transparent 50%),
+                      radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.1), transparent 50%);
+}
+.code-font {
+    font-family: 'Fira Code', monospace;
+}
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #000; 
+}
+::-webkit-scrollbar-thumb {
+    background: #333; 
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #555; 
+}
+.glass-panel {
+    background: rgba(23, 23, 23, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}

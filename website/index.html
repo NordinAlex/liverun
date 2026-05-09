@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>liverun - Zero-config live reloading for Express.js</title>
+    <link rel="icon" href="./images/favicon.ico" type="image/x-icon">
+    <meta name="description"
+        content="Zero-configuration hot reloading tool for Express.js and Node.js. Automatically restarts backend and updates frontend instantly.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="./tailwind-config.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body
+    class="antialiased min-h-screen flex flex-col relative bg-darker selection:bg-primary/30 selection:text-white overflow-x-hidden">
+
+    <!-- Background Decorative Blobs -->
+    <div class="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+        <div
+            class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/20 rounded-full mix-blend-screen filter blur-[100px] opacity-50 animate-blob">
+        </div>
+        <div
+            class="absolute top-[20%] right-[-10%] w-96 h-96 bg-secondary/20 rounded-full mix-blend-screen filter blur-[100px] opacity-50 animate-blob animation-delay-2000">
+        </div>
+        <div
+            class="absolute bottom-[-10%] left-[20%] w-96 h-96 bg-accent/20 rounded-full mix-blend-screen filter blur-[100px] opacity-50 animate-blob animation-delay-4000">
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="w-full border-b border-white/5 bg-black/40 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="#" class="flex items-center gap-3 group">
+                <img src="./images/logo-mark.png" alt="liverun logo"
+                    class="w-8 h-8 group-hover:scale-110 transition-transform duration-300">
+                <span class="font-bold text-xl tracking-tight text-white">liverun</span>
+            </a>
+            <nav class="hidden md:flex items-center gap-8 text-sm font-medium">
+                <a href="#features" class="text-gray-400 hover:text-white transition-colors">Features</a>
+                <a href="#how-it-works" class="text-gray-400 hover:text-white transition-colors">How it Works</a>
+                <a href="#installation" class="text-gray-400 hover:text-white transition-colors">Installation</a>
+            </nav>
+            <div class="flex items-center gap-4">
+                <a href="https://github.com/NordinAlex/liverun" target="_blank" rel="noopener noreferrer"
+                    class="text-gray-400 hover:text-white transition-colors flex items-center gap-2 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-md border border-white/5">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill-rule="evenodd"
+                            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                            clip-rule="evenodd"></path>
+                    </svg>
+                    <span class="hidden sm:inline">GitHub</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow z-10">
+
+        <!-- Hero Section -->
+        <section class="pt-24 pb-20 px-6 sm:pt-32 sm:pb-28">
+            <div class="max-w-4xl mx-auto text-center">
+                <a href="https://github.com/NordinAlex/liverun" rel="noopener noreferrer" target="_blank"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-gray-300 mb-8 hover:bg-white/10 transition-colors backdrop-blur-sm cursor-pointer">
+                    <span class="flex h-2 w-2 rounded-full bg-accent relative">
+                        <span
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                    </span>
+                    Now with zero-config setup
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
+
+                <h1
+                    class="text-5xl sm:text-7xl font-extrabold tracking-tight mb-6 text-transparent bg-clip-text bg-gradient-to-br from-white via-gray-200 to-gray-600">
+                    Zero-config live reloading <br class="hidden sm:block"> for Express.js
+                </h1>
+
+                <p class="text-lg sm:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+                    Automatically restart your backend and instantly refresh your frontend in the browser on every file
+                    change. A seamless developer experience.
+                </p>
+
+                <!-- Terminal Code Block -->
+                <div
+                    class="max-w-lg mx-auto bg-[#0d0d0d] border border-white/10 rounded-xl overflow-hidden shadow-[0_0_40px_rgba(59,130,246,0.15)] mb-10 text-left relative group">
+                    <div
+                        class="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    </div>
+                    <div class="flex items-center px-4 py-3 border-b border-white/5 bg-[#141414]">
+                        <div class="flex gap-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+                        </div>
+                        <div class="mx-auto text-xs text-gray-500 font-medium">terminal</div>
+                    </div>
+                    <div class="p-5 sm:p-6 code-font text-sm text-gray-300 flex items-center justify-between">
+                        <div>
+                            <span class="text-secondary">$</span> <span class="text-primary">npx</span> liverun
+                            server.js
+                        </div>
+                        <button type="button" onclick="copyToClipboard('npx liverun server.js', this)"
+                            class="text-gray-500 hover:text-white transition-colors" aria-label="Copy to clipboard">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                </path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <a href="#installation"
+                        class="w-full sm:w-auto px-8 py-3.5 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 transition-all hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                        Get Started
+                    </a>
+                    <a href="#how-it-works"
+                        class="w-full sm:w-auto px-8 py-3.5 bg-transparent border border-white/20 text-white font-medium rounded-lg hover:bg-white/5 transition-colors">
+                        How it Works
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Divider -->
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+        </div>
+
+        <!-- Features Section -->
+        <section id="features" class="py-24 px-6 relative">
+            <div class="max-w-6xl mx-auto">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Everything you need, nothing you don't
+                    </h2>
+                    <p class="text-gray-400 max-w-2xl mx-auto text-lg">A frictionless development experience without the
+                        configuration overhead.</p>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-6">
+                    <!-- Feature 1 -->
+                    <div class="glass-panel p-8 rounded-2xl hover:bg-white/[0.02] transition-colors group">
+                        <div
+                            class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                            <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">Zero Configuration</h3>
+                        <p class="text-gray-400 leading-relaxed text-sm">No complex setup. Just prefix your start
+                            command with liverun and get instant live reloading capabilities out of the box.</p>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div class="glass-panel p-8 rounded-2xl hover:bg-white/[0.02] transition-colors group">
+                        <div
+                            class="w-12 h-12 rounded-xl bg-gradient-to-br from-secondary/20 to-secondary/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(139,92,246,0.2)]">
+                            <svg class="w-6 h-6 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                </path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">Backend Hot Restart</h3>
+                        <p class="text-gray-400 leading-relaxed text-sm">Automatically monitors your Node.js files and
+                            gracefully restarts the backend process efficiently whenever a change is detected.</p>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div class="glass-panel p-8 rounded-2xl hover:bg-white/[0.02] transition-colors group">
+                        <div
+                            class="w-12 h-12 rounded-xl bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                            <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                                </path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">Frontend Auto-Refresh</h3>
+                        <p class="text-gray-400 leading-relaxed text-sm">Changes to static assets trigger a seamless
+                            browser refresh via injected WebSockets. No manual F5 needed ever again.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How it Works Section -->
+        <section id="how-it-works" class="py-24 px-6 relative">
+            <div class="absolute inset-0 bg-white/[0.01] border-y border-white/5 pointer-events-none"></div>
+            <div class="max-w-6xl mx-auto relative z-10">
+                <div class="grid lg:grid-cols-2 gap-16 items-center">
+                    <div>
+                        <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">How it actually works</h2>
+                        <div class="space-y-8 text-gray-400">
+                            <div class="flex gap-4">
+                                <div class="flex-shrink-0 mt-1">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                                        <span class="text-primary font-bold text-sm">1</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="text-white font-medium text-lg mb-1">Smart Proxying</h4>
+                                    <p class="text-sm leading-relaxed">liverun spins up a transparent proxy server
+                                        that sits in front of your application. It forwards all requests seamlessly to
+                                        your backend without changing standard behavior.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="flex-shrink-0 mt-1">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center border border-secondary/20">
+                                        <span class="text-secondary font-bold text-sm">2</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="text-white font-medium text-lg mb-1">Intelligent Injection</h4>
+                                    <p class="text-sm leading-relaxed">As HTML responses flow through the proxy, it
+                                        automatically injects a tiny, invisible WebSocket client into the page. You
+                                        don't need to modify your HTML files manually.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="flex-shrink-0 mt-1">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center border border-accent/20">
+                                        <span class="text-accent font-bold text-sm">3</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="text-white font-medium text-lg mb-1">Real-time Communication</h4>
+                                    <p class="text-sm leading-relaxed">When the built-in file watcher detects a change,
+                                        it either restarts your backend node process or sends a signal over the
+                                        WebSocket to instruct the browser to reload the page instantly.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Diagram / Visual -->
+                    <div class="glass-panel rounded-2xl p-8 relative overflow-hidden shadow-2xl">
+                        <div
+                            class="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[60px] -mr-10 -mt-10 pointer-events-none">
+                        </div>
+                        <div
+                            class="absolute bottom-0 left-0 w-64 h-64 bg-accent/10 rounded-full blur-[60px] -ml-10 -mb-10 pointer-events-none">
+                        </div>
+
+                        <div class="relative z-10 space-y-4">
+                            <div
+                                class="flex items-center justify-between bg-black/50 p-4 rounded-xl border border-white/10 hover:border-white/20 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                        </path>
+                                    </svg>
+                                    <span class="text-gray-300 font-medium">File Watcher</span>
+                                </div>
+                                <span
+                                    class="text-accent text-xs font-semibold bg-accent/10 border border-accent/20 px-2 py-1 rounded">detects
+                                    changes</span>
+                            </div>
+
+                            <div class="w-px h-8 bg-gradient-to-b from-white/20 to-transparent mx-auto relative">
+                                <div class="absolute inset-0 bg-primary/50 w-px h-full animate-pulse"></div>
+                            </div>
+
+                            <div
+                                class="flex items-center justify-between bg-black/50 p-4 rounded-xl border border-white/10 hover:border-white/20 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01">
+                                        </path>
+                                    </svg>
+                                    <span class="text-gray-300 font-medium">Proxy Server</span>
+                                </div>
+                                <span
+                                    class="text-primary text-xs font-semibold bg-primary/10 border border-primary/20 px-2 py-1 rounded">restarts
+                                    &amp; injects</span>
+                            </div>
+
+                            <div class="w-px h-8 bg-gradient-to-b from-white/20 to-transparent mx-auto relative">
+                                <div
+                                    class="absolute inset-0 bg-secondary/50 w-px h-full animate-pulse animation-delay-500">
+                                </div>
+                            </div>
+
+                            <div
+                                class="flex items-center justify-between bg-black/50 p-4 rounded-xl border border-white/10 hover:border-white/20 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9">
+                                        </path>
+                                    </svg>
+                                    <span class="text-gray-300 font-medium">Web Browser</span>
+                                </div>
+                                <span
+                                    class="text-secondary text-xs font-semibold bg-secondary/10 border border-secondary/20 px-2 py-1 rounded">auto
+                                    refreshes</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Installation Section -->
+        <section id="installation" class="py-24 px-6">
+            <div class="max-w-3xl mx-auto">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Installation &amp; Usage</h2>
+                    <p class="text-gray-400 text-lg">Get up and running in less than a minute.</p>
+                </div>
+
+                <div class="space-y-10 relative">
+                    <!-- Step 1 -->
+                    <div class="relative z-10 glass-panel p-6 rounded-2xl">
+                        <h3 class="text-xl font-semibold text-white mb-4 flex items-center gap-3">
+                            <span
+                                class="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 text-sm border border-white/10">1</span>
+                            Install the package
+                        </h3>
+                        <p class="text-gray-400 mb-4 text-sm">Install liverun as a development dependency in your
+                            project.</p>
+                        <div class="bg-[#0a0a0a] rounded-xl border border-white/10 overflow-hidden">
+                            <div class="p-4 code-font text-gray-300 flex items-center justify-between group">
+                                <div><span class="text-primary">npm</span> install --save-dev liverun
+                                </div>
+                                <button type="button"
+                                    onclick="copyToClipboard('npm install --save-dev liverun', this)"
+                                    class="text-gray-500 hover:text-white transition-colors" aria-label="Copy code">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                        </path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="relative z-10 glass-panel p-6 rounded-2xl">
+                        <h3 class="text-xl font-semibold text-white mb-4 flex items-center gap-3">
+                            <span
+                                class="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 text-sm border border-white/10">2</span>
+                            Update package.json scripts
+                        </h3>
+                        <p class="text-gray-400 mb-4 text-sm">Add a dev script to start your application with
+                            liverun instead of node.</p>
+                        <div class="bg-[#0a0a0a] rounded-xl border border-white/10 overflow-hidden">
+                            <div class="flex items-center px-4 py-2 border-b border-white/5 bg-[#141414]">
+                                <span class="text-xs text-gray-500 font-medium">package.json</span>
+                            </div>
+                            <div class="p-4 code-font text-gray-300 relative group text-sm">
+                                <pre><code>{
+  <span class="text-gray-400">"scripts"</span>: {
+    <span class="text-gray-400">"start"</span>: <span class="text-accent">"node server.js"</span>,
+    <span class="text-primary">"dev"</span>: <span class="text-accent">"liverun server.js"</span>
+  }
+}</code></pre>
+                                <button type="button" onclick='copyToClipboard("{\"scripts\": {\"start\": \"node server.js\", \"dev\": \"liverun server.js\"}}", this)' 
+                                    class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+                                    aria-label="Copy code">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                        </path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="relative z-10 glass-panel p-6 rounded-2xl">
+                        <h3 class="text-xl font-semibold text-white mb-4 flex items-center gap-3">
+                            <span
+                                class="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 text-sm border border-white/10">3</span>
+                            Run your project
+                        </h3>
+                        <p class="text-gray-400 mb-4 text-sm">Start your development server and enjoy live reloading.
+                        </p>
+                        <div class="bg-[#0a0a0a] rounded-xl border border-white/10 overflow-hidden">
+                            <div class="p-4 code-font text-gray-300 flex items-center justify-between group">
+                                <div><span class="text-primary">npm</span> run dev</div>
+                                <button type="button" onclick="copyToClipboard('npm run dev', this)"
+                                    class="text-gray-500 hover:text-white transition-colors" aria-label="Copy code">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                        </path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 bg-black mt-12 relative z-10">
+        <div class="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div class="flex items-center gap-3 opacity-70 hover:opacity-100 transition-opacity">
+                <img src="./images/logo-mark.png" alt="liverun logo" class="w-6 h-6 grayscale">
+                <span class="font-bold text-lg text-white">liverun</span>
+            </div>
+
+            <div class="flex items-center gap-8 text-sm text-gray-500">
+                <a href="https://github.com/NordinAlex/liverun" rel="noopener noreferrer" target="_blank"
+                    class="hover:text-white transition-colors">GitHub</a>
+                <a href="https://www.npmjs.com/package/liverun" rel="noopener noreferrer" target="_blank"
+                    class="hover:text-white transition-colors">npm</a>
+                <a href="https://alexnordin.dev" rel="noopener noreferrer" target="_blank"
+                    class="hover:text-white transition-colors">Developer</a>
+            </div>
+
+            <div class="text-sm text-gray-600">
+                &copy;
+                <script>document.write(new Date().getFullYear())</script> Open Source. MIT License.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Script for copy to clipboard functionality -->
+    <script src="./main.js"></script>
+</body>
+</html>
