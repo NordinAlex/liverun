@@ -1,6 +1,6 @@
 {
   "name": "liverun",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "A simple tool for live reloading during development. This package should be installed as a devDependency.",
   "author": {
     "name": "Alex Nordin",
