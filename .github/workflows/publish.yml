@@ -82,6 +82,10 @@ jobs:
     needs: [build, test]
     runs-on: ubuntu-latest
     environment: npm-publish
+    
+    # Exponera versionen så att Release-jobbet kan läsa den
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     permissions:
       contents: write
@@ -98,7 +102,7 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
-          package-manager-cache: false # Never use caching in release builds
+          package-manager-cache: false 
 
       - name: Download build artifact
         uses: actions/download-artifact@v7
@@ -118,9 +122,6 @@ jobs:
           echo "tag=v$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
           echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
 
-      # npm CLI auto-detects the OIDC token from the GitHub Actions environment.
-      # No NPM_TOKEN secret needed — authentication and provenance are handled
-      # automatically via the trusted publisher configured on npmjs.com.
       - name: Publish to npm (OIDC)
         run: npm publish --access public
 
@@ -143,22 +144,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          ref: main # Pull the version-bumped commit
+          ref: main 
 
-      - name: Get version from package.json
-        id: pkg
-        run: |
-          echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+      - name: Get current date
+        id: date
+        run: echo "today=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ steps.pkg.outputs.version }}
-          name: v${{ steps.pkg.outputs.version }}
+          tag_name: v${{ needs.publish.outputs.version }}
+          name: ${{ needs.publish.outputs.version }} (${{ steps.date.outputs.today }})
           generate_release_notes: true
           body: |
             ## Install / Update
 
             ```bash
-            npx liverun@${{ steps.pkg.outputs.version }} server.js
+            npm install --save-dev liverun@${{ needs.publish.outputs.version }}
             ```

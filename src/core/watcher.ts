@@ -1,33 +1,50 @@
 import chokidar from 'chokidar';
+import path from 'path';
 import type { WatcherOptions, WatcherResult } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
-export function startWatcher({ serverWatch, clientWatch, onServerChange, onClientChange }: WatcherOptions): WatcherResult {
-  // Common ignore patterns (node_modules, .git, liverun internals, etc.)
-  const ignored = [/(^|[\/\\])\./, '**/node_modules/**', '**/_liverun_preload.js', '**/dist/**'];
+// File extensions that should trigger a server restart
+const SERVER_EXTENSIONS = new Set(['.js', '.ts', '.mjs', '.cjs', '.json']);
 
-  const serverWatcher = chokidar.watch(serverWatch, {
-    ignored,
+// Patterns to ignore across all watchers
+const IGNORED = [
+  /(^|[\/\\])\./,          // Dotfiles and directories (.git, .env, etc.)
+  '**/node_modules/**',
+  '**/dist/**',
+  '**/package-lock.json',
+];
+
+/**
+ * Returns the file extension (e.g. '.js') or an empty string for extensionless files.
+ */
+function getExtension(filePath: string): string {
+  const base = path.basename(filePath);
+  const dotIndex = base.lastIndexOf('.');
+  return dotIndex > 0 ? base.slice(dotIndex) : '';
+}
+
+export function startWatcher({ serverWatch, clientWatch, onServerChange, onClientChange }: WatcherOptions): WatcherResult {
+  const watcherOptions: chokidar.WatchOptions = {
+    ignored: IGNORED,
     persistent: true,
     ignoreInitial: true,
-  });
+  };
+
+  const serverWatcher = chokidar.watch(serverWatch, watcherOptions);
 
   serverWatcher.on('error', (error: unknown) => {
     logger.error(`Server watcher error: ${error instanceof Error ? error.message : String(error)}`);
   });
 
   serverWatcher.on('all', (event: string, filePath: string) => {
-    // Only restart for JS/TS/JSON files
-    if (filePath.endsWith('.js') || filePath.endsWith('.ts') || filePath.endsWith('.json')) {
+    // Restart for known server extensions and extensionless files (e.g. bin/www)
+    const ext = getExtension(filePath);
+    if (SERVER_EXTENSIONS.has(ext) || ext === '') {
       onServerChange(filePath);
     }
   });
 
-  const clientWatcher = chokidar.watch(clientWatch, {
-    ignored,
-    persistent: true,
-    ignoreInitial: true,
-  });
+  const clientWatcher = chokidar.watch(clientWatch, watcherOptions);
 
   clientWatcher.on('error', (error: unknown) => {
     logger.error(`Client watcher error: ${error instanceof Error ? error.message : String(error)}`);
@@ -44,3 +61,4 @@ export function startWatcher({ serverWatch, clientWatch, onServerChange, onClien
     }
   };
 }
+

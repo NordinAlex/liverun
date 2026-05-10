@@ -11,117 +11,157 @@ import { startRunner } from '../core/runner.js';
 import { logger } from '../utils/logger.js';
 import type { CliOptions } from '../types/index.js';
 
+// Extensions to try when the user omits the file extension
+const SCRIPT_EXTENSIONS = ['.js', '.ts', '.mjs', '.cjs'];
+
+// -------------------------------------------------------------------
+// Helpers
+// -------------------------------------------------------------------
+
+/**
+ * Resolve a script path, trying common extensions if the exact path doesn't exist.
+ * Exits the process with an error if no matching file is found.
+ */
+function resolveScript(script: string): string {
+  const absolute = path.resolve(process.cwd(), script);
+
+  if (fs.existsSync(absolute)) return absolute;
+
+  const resolved = SCRIPT_EXTENSIONS
+    .map(ext => absolute + ext)
+    .find(p => fs.existsSync(p));
+
+  if (resolved) return resolved;
+
+  logger.error(`Script not found: ${absolute}`);
+  logger.error(`Also tried: ${SCRIPT_EXTENSIONS.map(ext => path.basename(absolute) + ext).join(', ')}`);
+  process.exit(1);
+}
+
+/**
+ * Detect the port from the script's source code by analysing common patterns:
+ *   - process.env.PORT || <number>
+ *   - .listen(<number>)
+ *   - const PORT = <number>
+ */
+function detectPortFromSource(scriptPath: string): number {
+  const DEFAULT_PORT = 3000;
+
+  try {
+    const raw = fs.readFileSync(scriptPath, 'utf8');
+
+    // Strip comments to avoid matching ports in commented-out code
+    const source = raw
+      .replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+
+    const patterns: RegExp[] = [
+      /process\.env\.PORT\s*\|\|\s*['"]?(\d+)['"]?/,   // process.env.PORT || 3000
+      /\.listen\(\s*['"]?(\d+)['"]?/,                   // .listen(3000)
+      /(?:const|let|var)\s*(?:PORT|port)\s*=\s*['"]?(\d+)['"]?/,  // const PORT = 3000
+    ];
+
+    for (const pattern of patterns) {
+      const match = source.match(pattern);
+      if (match) return parseInt(match[1], 10);
+    }
+  } catch (_) {}
+
+  return DEFAULT_PORT;
+}
+
+/**
+ * Check whether a TCP port is available.
+ */
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise(resolve => {
+    const srv = net.createServer();
+    srv.once('error', () => resolve(false));
+    srv.once('listening', () => { srv.close(); resolve(true); });
+    srv.listen(port);
+  });
+}
+
+/**
+ * Find the next available port starting from `startPort`.
+ */
+async function findAvailablePort(startPort: number): Promise<number> {
+  let p = startPort;
+  while (!(await isPortAvailable(p))) p++;
+  return p;
+}
+
+/**
+ * Prompt the user to pick an alternative port when the requested one is busy.
+ * Returns the chosen port, or exits the process if the user declines.
+ */
+async function promptForAlternativePort(requestedPort: number): Promise<number> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+  const answer = await new Promise<string>(resolve => {
+    rl.question(
+      `Port ${requestedPort} is already in use. Would you like to run the app on another available port? (y/n) `,
+      ans => { rl.close(); resolve(ans); },
+    );
+  });
+
+  if (answer.toLowerCase().startsWith('y')) {
+    return findAvailablePort(requestedPort + 1);
+  }
+
+  logger.error(`Cannot start server because port ${requestedPort} is in use.`);
+  process.exit(1);
+}
+
+/**
+ * Build watch directory lists from a comma-separated string.
+ * Includes paths relative to both cwd and the target script's directory.
+ */
+function buildWatchDirs(dirsString: string, targetDir: string): string[] {
+  const dirs = dirsString.split(',').map(s => s.trim()).filter(Boolean);
+  return Array.from(new Set([
+    ...dirs,
+    ...dirs.map(d => path.resolve(targetDir, d)),
+  ]));
+}
+
+// -------------------------------------------------------------------
+// CLI definition
+// -------------------------------------------------------------------
+
 program
   .version('0.5.2')
   .argument('<script>', 'The express server script to run (e.g. server.js)')
   .option('-p, --port <number>', 'Port for the live-dev proxy to listen on')
-  .option('-s, --watch-server <directories>', 'Comma separated directories to watch for server restart', '.,src,routes,models,controllers')
+  .option('-s, --watch-server <directories>', 'Comma separated directories to watch for server restart', '.,src,bin,routes,models,controllers')
   .option('-c, --watch-client <directories>', 'Comma separated directories to watch for client refresh', 'public,views')
   .action(async (script: string, options: CliOptions) => {
-    let targetScript = path.resolve(process.cwd(), script);
-
-    // If the script doesn't exist as-is, try common Node.js extensions
-    if (!fs.existsSync(targetScript)) {
-      const extensions = ['.js', '.ts', '.mjs', '.cjs'];
-      const resolved = extensions
-        .map(ext => targetScript + ext)
-        .find(p => fs.existsSync(p));
-
-      if (resolved) {
-        targetScript = resolved;
-      } else {
-        logger.error(`Script not found: ${targetScript}`);
-        logger.error(`Also tried: ${extensions.map(ext => path.basename(targetScript) + ext).join(', ')}`);
-        process.exit(1);
-      }
-    }
-
+    const targetScript = resolveScript(script);
     const targetDir = path.dirname(targetScript);
 
-    // --- Port detection from source code ---
-    let defaultProxyPort = 3000;
+    // --- Determine proxy port ---
+    const detectedPort = options.port
+      ? parseInt(options.port)
+      : detectPortFromSource(targetScript);
 
-    if (!options.port) {
-      try {
-        const rawContent = fs.readFileSync(targetScript, 'utf8');
+    let proxyPort = detectedPort;
 
-        // Strip comments so we don't match ports in commented-out code
-        const content = rawContent
-          .replace(/\/\/.*$/gm, '')       // Remove single-line comments
-          .replace(/\/\*[\s\S]*?\*\//g, ''); // Remove multi-line comments
-
-        // Check for process.env.PORT usage
-        const envPortMatch = content.match(/process\.env\.PORT\s*\|\|\s*['"]?(\d+)['"]?/);
-        // Check for hardcoded .listen(number) — a literal number passed directly
-        const listenMatch = content.match(/\.listen\(\s*['"]?(\d+)['"]?/);
-        // Check for PORT = <number> (hardcoded constant)
-        const constPortMatch = content.match(/(?:const|let|var)\s*(?:PORT|port)\s*=\s*['"]?(\d+)['"]?/);
-
-        if (envPortMatch) {
-          defaultProxyPort = parseInt(envPortMatch[1], 10);
-        } else if (listenMatch) {
-          defaultProxyPort = parseInt(listenMatch[1], 10);
-        } else if (constPortMatch) {
-          defaultProxyPort = parseInt(constPortMatch[1], 10);
-        }
-      } catch (err) { }
+    if (!(await isPortAvailable(proxyPort))) {
+      proxyPort = await promptForAlternativePort(proxyPort);
     }
 
-    let proxyPort = options.port ? parseInt(options.port) : defaultProxyPort;
-
-    const checkPort = (p: number): Promise<boolean> => {
-      return new Promise(resolve => {
-        const srv = net.createServer();
-        srv.once('error', () => resolve(false));
-        srv.once('listening', () => { srv.close(); resolve(true); });
-        srv.listen(p);
-      });
-    };
-
-    // Find an available port starting from the given one
-    const findAvailablePort = async (startPort: number): Promise<number> => {
-      let p = startPort;
-      while (!(await checkPort(p))) {
-        p++;
-      }
-      return p;
-    };
-
-    if (!(await checkPort(proxyPort))) {
-      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-      const answer = await new Promise<string>(resolve => {
-        rl.question(`Port ${proxyPort} is already in use. Would you like to run the app on another available port? (y/n) `, ans => {
-          rl.close();
-          resolve(ans);
-        });
-      });
-      if (answer.toLowerCase().startsWith('y')) {
-        proxyPort = await findAvailablePort(proxyPort + 1);
-      } else {
-        logger.error(`Cannot start server because port ${proxyPort} is in use.`);
-        process.exit(1);
-      }
-    }
-
-    // Internal port for the actual express server (the preload hook redirects to this)
+    // Internal port for the actual app (the preload hook redirects to this)
     let internalPort = await findAvailablePort(proxyPort + 1);
 
-    // Helper to watch both relative to cwd and relative to the target script's directory
-    const getWatchDirs = (dirsString: string) => {
-      const dirs = dirsString.split(',').map((s: string) => s.trim()).filter(Boolean);
-      return Array.from(new Set([
-        ...dirs,
-        ...dirs.map(d => path.resolve(targetDir, d))
-      ]));
-    };
-
+    // --- Boot up ---
     logger.system('Starting...');
+
     let getRunnerError: (() => string) | null = null;
 
-    const wss = startProxy({
-      proxyPort: proxyPort,
+    const proxy = startProxy({
+      proxyPort,
       targetPort: internalPort,
-      getLastError: () => typeof getRunnerError === 'function' ? getRunnerError() : ''
+      getLastError: () => (typeof getRunnerError === 'function' ? getRunnerError() : ''),
     });
 
     const runner = startRunner({
@@ -129,54 +169,55 @@ program
       port: internalPort,
       onReady: () => {
         logger.success('Server is ready!');
-        wss.broadcastReload();
+        proxy.broadcastReload();
       },
       onCrash: () => {
         logger.error('Server crashed! Triggering browser reload to show error...');
-        wss.broadcastReload();
+        proxy.broadcastReload();
       },
       onPortDetected: (newPort: number) => {
-        // The child process couldn't bind to the internal port and retried on a new one
-        // Update the proxy to forward to the new port
         internalPort = newPort;
-        wss.updateTargetPort(newPort);
-      }
+        proxy.updateTargetPort(newPort);
+      },
     });
 
     getRunnerError = runner.getLastError;
 
-    let serverTimeout: NodeJS.Timeout | null = null;
-    let clientTimeout: NodeJS.Timeout | null = null;
+    // --- File watchers (with debounce) ---
+    let serverDebounce: NodeJS.Timeout | null = null;
+    let clientDebounce: NodeJS.Timeout | null = null;
 
     const watcher = startWatcher({
-      serverWatch: getWatchDirs(options.watchServer),
-      clientWatch: getWatchDirs(options.watchClient),
+      serverWatch: buildWatchDirs(options.watchServer, targetDir),
+      clientWatch: buildWatchDirs(options.watchClient, targetDir),
       onServerChange: (filePath: string) => {
-        if (serverTimeout) clearTimeout(serverTimeout);
-        serverTimeout = setTimeout(() => {
+        if (serverDebounce) clearTimeout(serverDebounce);
+        serverDebounce = setTimeout(() => {
           logger.system(`Backend file changed: ${filePath}`);
           logger.system('Restarting server...');
           runner.restart();
         }, 200);
       },
       onClientChange: (filePath: string) => {
-        if (clientTimeout) clearTimeout(clientTimeout);
-        clientTimeout = setTimeout(() => {
+        if (clientDebounce) clearTimeout(clientDebounce);
+        clientDebounce = setTimeout(() => {
           logger.system(`Frontend file changed: ${filePath}`);
           logger.system('Refreshing browser...');
-          wss.broadcastReload();
+          proxy.broadcastReload();
         }, 200);
-      }
+      },
     });
 
+    // --- Graceful shutdown ---
     let isShuttingDown = false;
+
     const shutdown = () => {
       if (isShuttingDown) return;
       isShuttingDown = true;
       logger.system('\nShutting down liverun...');
-      try { runner.kill(); } catch (e) {}
-      try { watcher.close(); } catch (e) {}
-      try { wss.closeProxy(); } catch (e) {}
+      try { runner.kill(); } catch (_) {}
+      try { watcher.close(); } catch (_) {}
+      try { proxy.closeProxy(); } catch (_) {}
       process.exit(0);
     };
 

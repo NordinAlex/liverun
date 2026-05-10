@@ -185,21 +185,39 @@ export function startProxy({ proxyPort, targetPort, getLastError }: ProxyOptions
 
   // Setup WebSocket Server for auto-refresh
   const wss = new WebSocketServer({ server, path: '/_live_dev_ws' });
+  let pendingReload = false;
 
   wss.on('error', (err) => {
     logger.error(`WebSocket server error: ${err.message}`);
   });
 
+  // When a client connects (or reconnects), send any pending reload
+  wss.on('connection', (client) => {
+    if (pendingReload) {
+      pendingReload = false;
+      try {
+        client.send(JSON.stringify({ type: 'RELOAD' }));
+      } catch (e) {}
+    }
+  });
+
   const broadcastReload = () => {
+    let sent = false;
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         try {
           client.send(JSON.stringify({ type: 'RELOAD' }));
+          sent = true;
         } catch (e) {
           // Client might have disconnected between readyState check and send
         }
       }
     });
+
+    // If no clients received the message, queue it for the next connection
+    if (!sent) {
+      pendingReload = true;
+    }
   };
 
   const closeProxy = () => {
