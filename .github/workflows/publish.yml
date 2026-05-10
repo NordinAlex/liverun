@@ -82,10 +82,6 @@ jobs:
     needs: [build, test]
     runs-on: ubuntu-latest
     environment: npm-publish
-    
-    # Exponera versionen så att Release-jobbet kan läsa den
-    outputs:
-      version: ${{ steps.version.outputs.version }}
 
     permissions:
       contents: write
@@ -102,7 +98,7 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
-          package-manager-cache: false 
+          package-manager-cache: false
 
       - name: Download build artifact
         uses: actions/download-artifact@v7
@@ -116,11 +112,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Bump patch version
-        id: version
         run: |
           npm version patch -m "chore: release v%s [skip ci]"
-          echo "tag=v$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
-          echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm (OIDC)
         run: npm publish --access public
@@ -135,7 +128,6 @@ jobs:
     name: Create GitHub Release
     needs: publish
     runs-on: ubuntu-latest
-    environment: npm-publish
 
     permissions:
       contents: write
@@ -144,7 +136,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          ref: main 
+          ref: main
+
+      - name: Read version from package.json
+        id: pkg
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
 
       - name: Get current date
         id: date
@@ -153,12 +152,12 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ needs.publish.outputs.version }}
-          name: ${{ needs.publish.outputs.version }} (${{ steps.date.outputs.today }})
+          tag_name: v${{ steps.pkg.outputs.version }}
+          name: v${{ steps.pkg.outputs.version }} (${{ steps.date.outputs.today }})
           generate_release_notes: true
           body: |
             ## Install / Update
 
             ```bash
-            npm install --save-dev liverun@${{ needs.publish.outputs.version }}
+            npm install --save-dev liverun@${{ steps.pkg.outputs.version }}
             ```

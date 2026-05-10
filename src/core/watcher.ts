@@ -1,4 +1,4 @@
-import chokidar from 'chokidar';
+import chokidar, { type ChokidarOptions } from 'chokidar';
 import path from 'path';
 import type { WatcherOptions, WatcherResult } from '../types/index.js';
 import { logger } from '../utils/logger.js';
@@ -24,7 +24,7 @@ function getExtension(filePath: string): string {
 }
 
 export function startWatcher({ serverWatch, clientWatch, onServerChange, onClientChange }: WatcherOptions): WatcherResult {
-  const watcherOptions: chokidar.WatchOptions = {
+  const watcherOptions: ChokidarOptions = {
     ignored: IGNORED,
     persistent: true,
     ignoreInitial: true,
