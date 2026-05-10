@@ -8,6 +8,7 @@
 
 [![npm version](https://badge.fury.io/js/liverun.svg)](https://badge.fury.io/js/liverun)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/NordinAlex/liverun/actions/workflows/publish.yml/badge.svg)](https://github.com/NordinAlex/liverun/actions/workflows/publish.yml)
 
 A **zero-configuration** hot reloading tool designed to supercharge your Express.js and Node.js development.
 
@@ -15,10 +16,15 @@ Get the blazing-fast, modern developer experience of frameworks like Next.js or 
 
 ## Features ✨
 
-- **Zero Configuration:** No need to modify your Express app or add custom middleware.
-- **Backend Hot Restart:** Automatically restarts your Node process when server-side files (e.g., `.js`, `.ts`) change.
-- **Frontend Auto-Refresh:** Instantly reloads the browser when client-side assets (e.g., HTML, CSS, client-side JS) change.
-- **Seamless Injection:** Uses a lightweight reverse proxy to dynamically inject the live-reload script into HTML responses.
+- **Zero Configuration** — No need to modify your Express app or add custom middleware.
+- **Backend Hot Restart** — Automatically restarts your Node process when server-side files (`.js`, `.ts`, `.json`) change.
+- **Frontend Auto-Refresh** — Instantly reloads the browser when client-side assets (HTML, CSS, client-side JS) change.
+- **Seamless Injection** — Uses a lightweight reverse proxy to dynamically inject the live-reload script into HTML responses.
+- **Smart Port Detection** — Reads your source code to detect the port your app uses. Handles port conflicts with an interactive prompt.
+- **Port Interception** — Intercepts `net.Server.listen()` via a preload hook, so even hardcoded ports (e.g., `app.listen(4000)`) work seamlessly.
+- **Error Overlay** — Displays a styled HTML error page in the browser when your server crashes, complete with the terminal error output. The page auto-reloads when the server recovers.
+- **Graceful Shutdown** — Properly cleans up child processes, file watchers, and proxies on SIGINT/SIGTERM. Force-kills hung processes after a timeout.
+- **Debounced Restarts** — File change events are debounced to avoid unnecessary rapid restarts.
 
 ## Installation 📦
 
@@ -59,16 +65,17 @@ npm run dev
 
 When you run `liverun`, it wraps your application:
 
-1. It spins up a **Proxy Server** on port `3000` (by default).
-2. It spawns your actual Express app on an internal port (e.g., `3001`).
+1. It spins up a **Proxy Server** on port `3000` (or the port it detects from your source code).
+2. It spawns your actual Express app on an internal port, using a preload hook to intercept `net.Server.listen()`.
 3. As traffic flows through the proxy, it watches for HTML responses and injects a tiny WebSocket client script right before the `</body>` tag.
 4. When `chokidar` detects frontend changes, it broadcasts a signal over WebSockets to refresh the browser. When backend files change, it safely restarts the child Node process.
+5. If the server crashes, the proxy catches the connection error and displays a styled error overlay in the browser with the terminal output. The page auto-reloads once the server recovers.
 
 ## CLI Options 🛠️
 
-You can customize the ports and the directories that are being watched:
+You can customize the port and the directories that are being watched:
 
-```bash
+```
 Usage: liverun [options] <script>
 
 Arguments:
@@ -76,9 +83,11 @@ Arguments:
 
 Options:
   -V, --version                     output the version number
-  -p, --port <number>               Port for the live-dev proxy to listen on (default: "3000")
-  -s, --watch-server <directories>  Comma separated directories to watch for server restart (default: ".,src,routes,models,controllers")
-  -c, --watch-client <directories>  Comma separated directories to watch for client refresh (default: "public,views")
+  -p, --port <number>               Port for the live-dev proxy to listen on
+  -s, --watch-server <directories>  Comma separated directories to watch for server restart
+                                    (default: ".,src,routes,models,controllers")
+  -c, --watch-client <directories>  Comma separated directories to watch for client refresh
+                                    (default: "public,views")
   -h, --help                        display help for command
 ```
 
@@ -88,6 +97,18 @@ If your backend is in `api/` and frontend is in `static/`:
 
 ```bash
 npx liverun -s api,config -c static,templates server.js
+```
+
+## Contributing 🤝
+
+See [docs/setup.md](docs/setup.md) for local development setup and [docs/architecture.md](docs/architecture.md) for the project structure.
+
+```bash
+git clone https://github.com/NordinAlex/liverun.git
+cd liverun
+npm install
+npm run dev      # Watch mode (rebuilds on changes)
+npm test         # Run test suite
 ```
 
 ## License 📄

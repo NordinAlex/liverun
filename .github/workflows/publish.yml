@@ -75,7 +75,7 @@ jobs:
         run: npm test
 
   # ──────────────────────────────────────────────
-  # Job 3 – Publish to npm (protected environment)
+  # Job 3 – Publish to npm (OIDC trusted publishing)
   # ──────────────────────────────────────────────
   publish:
     name: Publish to npm
@@ -85,7 +85,7 @@ jobs:
 
     permissions:
       contents: write
-      id-token: write # Required for npm provenance
+      id-token: write # Required for OIDC trusted publishing
 
     steps:
       - name: Checkout repository
@@ -98,6 +98,7 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false # Never use caching in release builds
 
       - name: Download build artifact
         uses: actions/download-artifact@v7
@@ -117,10 +118,11 @@ jobs:
           echo "tag=v$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
           echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # npm CLI auto-detects the OIDC token from the GitHub Actions environment.
+      # No NPM_TOKEN secret needed — authentication and provenance are handled
+      # automatically via the trusted publisher configured on npmjs.com.
+      - name: Publish to npm (OIDC)
+        run: npm publish --access public
 
       - name: Push version bump
         run: git push --follow-tags
