@@ -18,14 +18,25 @@ program
   .option('-s, --watch-server <directories>', 'Comma separated directories to watch for server restart', '.,src,routes,models,controllers')
   .option('-c, --watch-client <directories>', 'Comma separated directories to watch for client refresh', 'public,views')
   .action(async (script: string, options: CliOptions) => {
-    const targetScript = path.resolve(process.cwd(), script);
-    const targetDir = path.dirname(targetScript);
+    let targetScript = path.resolve(process.cwd(), script);
 
-    // Validate that the script file exists
+    // If the script doesn't exist as-is, try common Node.js extensions
     if (!fs.existsSync(targetScript)) {
-      logger.error(`Script not found: ${targetScript}`);
-      process.exit(1);
+      const extensions = ['.js', '.ts', '.mjs', '.cjs'];
+      const resolved = extensions
+        .map(ext => targetScript + ext)
+        .find(p => fs.existsSync(p));
+
+      if (resolved) {
+        targetScript = resolved;
+      } else {
+        logger.error(`Script not found: ${targetScript}`);
+        logger.error(`Also tried: ${extensions.map(ext => path.basename(targetScript) + ext).join(', ')}`);
+        process.exit(1);
+      }
     }
+
+    const targetDir = path.dirname(targetScript);
 
     // --- Port detection from source code ---
     let defaultProxyPort = 3000;
