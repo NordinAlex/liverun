@@ -3,10 +3,10 @@ import net from 'net';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { RunnerOptions } from '../types';
-import { logger } from '../utils/logger';
+import type { RunnerOptions, RunnerResult } from '../types/index.js';
+import { logger } from '../utils/logger.js';
 
-export function startRunner({ script, port, onReady, onCrash, onPortDetected }: RunnerOptions) {
+export function startRunner({ script, port, onReady, onCrash, onPortDetected }: RunnerOptions): RunnerResult {
   let child: ChildProcess | null = null;
   let isRestarting = false;
   let isReady = false;
@@ -167,7 +167,7 @@ export function startRunner({ script, port, onReady, onCrash, onPortDetected }: 
 
       switch (msg.type) {
         case '_liverun_port':
-          logger.info(`App requested port ${msg.port}, redirected to internal port ${port}`);
+          logger.info(`App requested port ${msg.port}`);
           break;
 
         case '_liverun_port_retry':

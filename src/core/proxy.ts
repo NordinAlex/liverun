@@ -1,169 +1,164 @@
 import http from 'http';
-import httpProxy from 'http-proxy';
+import net from 'net';
+import { createProxyMiddleware, responseInterceptor } from 'http-proxy-middleware';
+import type { RequestHandler } from 'http-proxy-middleware';
 import { WebSocketServer, WebSocket } from 'ws';
-import { injectScriptContent } from '../client/inject';
-import { ProxyOptions } from '../types';
-import { logger } from '../utils/logger';
+import { injectScriptContent } from '../client/inject.js';
+import type { ProxyOptions, ProxyResult } from '../types/index.js';
+import { logger } from '../utils/logger.js';
 
-// Extend WebSocketServer to include our custom broadcast method
-export interface WatchReloadWebSocketServer extends WebSocketServer {
-  broadcastReload: () => void;
-  closeProxy: () => void;
-  updateTargetPort: (newPort: number) => void;
-}
-
-export function startProxy({ proxyPort, targetPort, getLastError }: ProxyOptions): WatchReloadWebSocketServer {
+export function startProxy({ proxyPort, targetPort, getLastError }: ProxyOptions): ProxyResult {
   let currentTargetPort = targetPort;
   let isClosing = false;
 
-  const proxy = httpProxy.createProxyServer({
-    target: `http://localhost:${currentTargetPort}`,
-    ws: true,
-  });
+  // Create proxy middleware with dynamic target routing and response interception
+  const proxyMiddleware: RequestHandler = createProxyMiddleware({
+    target: `http://127.0.0.1:${currentTargetPort}`,
+    changeOrigin: false,
 
-  // Force backend to send uncompressed responses so we can modify HTML
-  proxy.on('proxyReq', (proxyReq) => {
-    proxyReq.removeHeader('accept-encoding');
-  });
+    // Dynamically route to the current target port (supports hot port changes)
+    router: () => `http://127.0.0.1:${currentTargetPort}`,
 
-  // Handle errors to avoid crashing the proxy
-  proxy.on('error', (err: any, req, resOrSocket: any) => {
-    // Don't process errors during shutdown
-    if (isClosing) return;
+    // We handle the response ourselves so we can inject the reload script into HTML
+    selfHandleResponse: true,
 
-    // Do not log expected network errors since they happen naturally during restart
-    if (!['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(err.code)) {
-      logger.error(`Proxy error: ${err.message}`);
-    }
+    // Subscribe to httpxy events
+    on: {
+      // Force backend to send uncompressed responses so we can modify HTML
+      proxyReq: (proxyReq) => {
+        proxyReq.removeHeader('accept-encoding');
+      },
 
-    // If it is an HTTP response (res)
-    if (resOrSocket && resOrSocket.writeHead && !resOrSocket.headersSent) {
-      try {
-        // Get the latest error and remove ANSI color codes
-        const errorOutput = getLastError
-          ? getLastError().replace(/\x1b\[[0-9;]*m/g, '')
-          : '';
+      // Intercept HTML responses and inject the live reload script
+      proxyRes: responseInterceptor(async (responseBuffer, proxyRes, req, res) => {
+        const contentType = proxyRes.headers['content-type'] || '';
 
-        // Extract only the error title (e.g. "ReferenceError: x is not defined")
-        let errorTitle = err.message;
-        if (errorOutput) {
-          const match = errorOutput.match(/^[a-zA-Z]*Error:.*$/m);
-          if (match) {
-            errorTitle = match[0];
-          } else {
-            // Fallback to first line if it's an unknown error format
-            const firstLine = errorOutput.split('\n').find(l => l.trim().length > 0);
-            if (firstLine) errorTitle = firstLine;
-          }
-        } else if (['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(err.code)) {
-          errorTitle = `Server disconnected (${err.code})`;
+        // Only modify HTML responses
+        if (!contentType.includes('text/html')) {
+          return responseBuffer;
         }
 
-        let errorHtmlBlock = '';
-        if (errorOutput) {
-          errorHtmlBlock = `
-            <div class="error-log">
-              <pre><code>${errorOutput.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
-            </div>
-          `;
+        let body = responseBuffer.toString('utf8');
+
+        // Inject script right before </body> or at the end if no </body>
+        const commentTag = `\n<!-- Inject by liverun -->\n`;
+        const injectTag = `\n<script id="liverun-script">\n${injectScriptContent}\n</script>\n`;
+
+        if (body.includes('</body>')) {
+          body = body.replace('</body>', `${commentTag}${injectTag}</body>`);
+        } else {
+          body += injectTag;
         }
 
-        const html = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Server Error</title>
-            <style>
-              body { font-family: system-ui, sans-serif; padding: 2rem; background: #fee2e2; color: #991b1b; }
-              .container { background: #fca5a5; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; margin: 0 auto; border: 1px solid #ef4444; }
-              .error-log { background: #1f2937; color: #f87171; padding: 1rem; border-radius: 4px; overflow-x: auto; margin-top: 1rem; }
-              pre { margin: 0; white-space: pre-wrap; font-family: monospace; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>Server is unavailable</h1>
-              <h2>${errorTitle.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h2>
-              <p>More details below:</p>
-              ${errorHtmlBlock}
-              <p style="margin-top: 1rem;"><em>This page will automatically reload when the server recovers.</em></p>
-            </div>
-            <script id="liverun-script">${injectScriptContent}</script>
-          </body>
-          </html>
-        `;
-        resOrSocket.writeHead(500, { 'Content-Type': 'text/html' });
-        resOrSocket.end(html);
-      } catch (writeErr) {
-        // Response may have already been partially sent, safely ignore
-        try { resOrSocket.end(); } catch (e) {}
-      }
-    }
-    // If it is a WebSocket (socket)
-    else if (resOrSocket && resOrSocket.destroy) {
-      try { resOrSocket.destroy(); } catch (e) {}
-    }
-  });
+        return body;
+      }),
 
-  // Inject script into HTML
-  proxy.on('proxyRes', (proxyRes, req, res: any) => {
-    // Only intercept HTML responses
-    const contentType = proxyRes.headers['content-type'] || '';
-    if (contentType.includes('text/html')) {
-      const _write = res.write;
-      const _end = res.end;
-      const _writeHead = res.writeHead;
+      // Handle proxy errors without crashing
+      error: (err: NodeJS.ErrnoException, req, resOrSocket) => {
+        // Don't process errors during shutdown
+        if (isClosing) return;
 
-      let body = '';
-
-      // We need to disable content-length since we are modifying the body
-      res.writeHead = function (...args: any[]) {
-        res.removeHeader('content-length');
-        return _writeHead.apply(res, args);
-      };
-
-      proxyRes.on('data', (chunk: Buffer) => {
-        body += chunk.toString('utf8');
-      });
-
-      // Avoid writing directly until end
-      res.write = function () {
-        return true;
-      };
-
-      res.end = function (chunk?: any, encoding?: any, cb?: any) {
-        try {
-          if (typeof chunk === 'string' || Buffer.isBuffer(chunk)) {
-            body += chunk.toString('utf8');
-          }
-
-          // Inject script right before </body> or at the end if no </body>
-          const commentTag = `\n<!-- Inject by liverun -->\n`;
-          const injectTag = `\n<script id="liverun-script">\n${injectScriptContent}\n</script>\n`;
-
-          if (body.includes('</body>')) {
-            body = body.replace('</body>', `${commentTag}${injectTag}</body>`);
-          } else {
-            body += injectTag;
-          }
-
-          _write.call(res, body);
-          _end.call(res, cb);
-        } catch (e) {
-          // If writing fails (e.g. connection reset), try to end gracefully
-          try { _end.call(res); } catch (endErr) {}
+        // Do not log expected network errors since they happen naturally during restart
+        if (!['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(err.code || '')) {
+          logger.error(`Proxy error: ${err.message}`);
         }
-      };
-    }
+
+        const res = resOrSocket as http.ServerResponse;
+
+        // If it is an HTTP response (res) and headers haven't been sent
+        if (res && typeof res.writeHead === 'function' && !res.headersSent) {
+          try {
+            // Get the latest error and remove ANSI color codes
+            const errorOutput = getLastError
+              ? getLastError().replace(/\x1b\[[0-9;]*m/g, '')
+              : '';
+
+            // Extract only the error title (e.g. "ReferenceError: x is not defined")
+            let errorTitle = err.message;
+            if (errorOutput) {
+              const match = errorOutput.match(/^[a-zA-Z]*Error:.*$/m);
+              if (match) {
+                errorTitle = match[0];
+              } else {
+                // Fallback to first line if it's an unknown error format
+                const firstLine = errorOutput.split('\n').find((l: string) => l.trim().length > 0);
+                if (firstLine) errorTitle = firstLine;
+              }
+            } else if (['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(err.code || '')) {
+              errorTitle = `Server disconnected (${err.code})`;
+            }
+
+            let errorHtmlBlock = '';
+            if (errorOutput) {
+              errorHtmlBlock = `
+                <div class="error-log">
+                  <pre><code>${errorOutput.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
+                </div>
+              `;
+            }
+
+            const html = `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Server Error</title>
+                <style>
+                  body { font-family: system-ui, sans-serif; padding: 2rem; background: #fee2e2; color: #991b1b; }
+                  .container { background: #fca5a5; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; margin: 0 auto; border: 1px solid #ef4444; }
+                  .error-log { background: #1f2937; color: #f87171; padding: 1rem; border-radius: 4px; overflow-x: auto; margin-top: 1rem; }
+                  pre { margin: 0; white-space: pre-wrap; font-family: monospace; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h1>Server is unavailable</h1>
+                  <h2>${errorTitle.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h2>
+                  <p>More details below:</p>
+                  ${errorHtmlBlock}
+                  <p style="margin-top: 1rem;"><em>This page will automatically reload when the server recovers.</em></p>
+                </div>
+                <script id="liverun-script">${injectScriptContent}</script>
+              </body>
+              </html>
+            `;
+            res.writeHead(500, { 'Content-Type': 'text/html' });
+            res.end(html);
+          } catch (writeErr) {
+            // Response may have already been partially sent, safely ignore
+            try { res.end(); } catch (e) {}
+          }
+        }
+        // If it is a WebSocket (socket)
+        else if (resOrSocket && typeof (resOrSocket as any).destroy === 'function') {
+          try { (resOrSocket as any).destroy(); } catch (e) {}
+        }
+      },
+    },
   });
 
   const server = http.createServer((req, res) => {
-    // Dynamically route to the current target port
-    proxy.web(req, res, { target: `http://localhost:${currentTargetPort}` });
+    proxyMiddleware(req, res, (err?: unknown) => {
+      // Fallback if proxy middleware calls next() with an error
+      if (err && !res.headersSent) {
+        res.writeHead(502, { 'Content-Type': 'text/plain' });
+        res.end('Bad Gateway');
+      }
+    });
+  });
+
+  // Handle WebSocket upgrades for the app's own WebSocket connections
+  server.on('upgrade', (req, socket, head) => {
+    if (req.url === '/_live_dev_ws') return; // handled by our WSS below
+    try {
+      proxyMiddleware.upgrade!(req, socket as net.Socket, head);
+    } catch (e) {
+      // WebSocket upgrade failed — destroy the socket safely
+      try { socket.destroy(); } catch (destroyErr) {}
+    }
   });
 
   // Handle proxy server errors (e.g. EADDRINUSE, EACCES)
-  server.on('error', (err: any) => {
+  server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
       logger.error(`Proxy port ${proxyPort} is already in use. Cannot start liverun.`);
       process.exit(1);
@@ -175,18 +170,8 @@ export function startProxy({ proxyPort, targetPort, getLastError }: ProxyOptions
     }
   });
 
-  server.on('upgrade', (req, socket, head) => {
-    if (req.url === '/_live_dev_ws') return; // handled by WS server below
-    try {
-      proxy.ws(req, socket as any, head, { target: `http://localhost:${currentTargetPort}` });
-    } catch (e) {
-      // WebSocket upgrade failed — destroy the socket safely
-      try { (socket as any).destroy(); } catch (destroyErr) {}
-    }
-  });
-
   // Handle unexpected socket errors to prevent crashing the proxy
-  server.on('clientError', (err: any, socket: any) => {
+  server.on('clientError', (_err: Error, socket: any) => {
     if (socket.writable) {
       try { socket.end('HTTP/1.1 400 Bad Request\r\n\r\n'); } catch (e) {}
     }
@@ -199,13 +184,13 @@ export function startProxy({ proxyPort, targetPort, getLastError }: ProxyOptions
   });
 
   // Setup WebSocket Server for auto-refresh
-  const wss = new WebSocketServer({ server, path: '/_live_dev_ws' }) as WatchReloadWebSocketServer;
+  const wss = new WebSocketServer({ server, path: '/_live_dev_ws' });
 
   wss.on('error', (err) => {
     logger.error(`WebSocket server error: ${err.message}`);
   });
 
-  wss.broadcastReload = () => {
+  const broadcastReload = () => {
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         try {
@@ -217,20 +202,19 @@ export function startProxy({ proxyPort, targetPort, getLastError }: ProxyOptions
     });
   };
 
-  wss.closeProxy = () => {
+  const closeProxy = () => {
     if (isClosing) return;
     isClosing = true;
 
     try { wss.close(); } catch (e) {}
     try { server.close(); } catch (e) {}
-    try { proxy.close(); } catch (e) {}
   };
 
   // Allow updating the target port dynamically
-  wss.updateTargetPort = (newPort: number) => {
+  const updateTargetPort = (newPort: number) => {
     currentTargetPort = newPort;
     logger.info(`Proxy target updated to port ${newPort}`);
   };
 
-  return wss;
+  return { broadcastReload, closeProxy, updateTargetPort };
 }

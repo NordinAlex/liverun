@@ -1,8 +1,8 @@
 import chokidar from 'chokidar';
-import { WatcherOptions } from '../types';
-import { logger } from '../utils/logger';
+import type { WatcherOptions, WatcherResult } from '../types/index.js';
+import { logger } from '../utils/logger.js';
 
-export function startWatcher({ serverWatch, clientWatch, onServerChange, onClientChange }: WatcherOptions) {
+export function startWatcher({ serverWatch, clientWatch, onServerChange, onClientChange }: WatcherOptions): WatcherResult {
   // Common ignore patterns (node_modules, .git, liverun internals, etc.)
   const ignored = [/(^|[\/\\])\./, '**/node_modules/**', '**/_liverun_preload.js', '**/dist/**'];
 
@@ -12,8 +12,8 @@ export function startWatcher({ serverWatch, clientWatch, onServerChange, onClien
     ignoreInitial: true,
   });
 
-  serverWatcher.on('error', (error) => {
-    logger.error(`Server watcher error: ${error.message || error}`);
+  serverWatcher.on('error', (error: unknown) => {
+    logger.error(`Server watcher error: ${error instanceof Error ? error.message : String(error)}`);
   });
 
   serverWatcher.on('all', (event: string, filePath: string) => {
@@ -29,8 +29,8 @@ export function startWatcher({ serverWatch, clientWatch, onServerChange, onClien
     ignoreInitial: true,
   });
 
-  clientWatcher.on('error', (error) => {
-    logger.error(`Client watcher error: ${error.message || error}`);
+  clientWatcher.on('error', (error: unknown) => {
+    logger.error(`Client watcher error: ${error instanceof Error ? error.message : String(error)}`);
   });
 
   clientWatcher.on('all', (event: string, filePath: string) => {

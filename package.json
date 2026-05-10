@@ -34,7 +34,7 @@
     "watch",
     "websocket"
   ],
-  "type": "commonjs",
+  "type": "module",
   "bin": {
     "liverun": "./dist/index.js"
   },
@@ -45,22 +45,22 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "dev": "tsup src/cli/index.ts --format cjs --watch",
-    "build": "tsup src/cli/index.ts --format cjs --clean",
-    "prepare": "npm run build"
+    "dev": "tsup src/cli/index.ts --format esm --watch",
+    "build": "tsup src/cli/index.ts --format esm --clean",
+    "test": "vitest run"
   },
   "dependencies": {
     "chokidar": "^5.0.0",
     "commander": "^14.0.3",
-    "http-proxy": "^1.18.1",
+    "http-proxy-middleware": "^4.0.0",
     "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/commander": "^2.12.0",
-    "@types/http-proxy": "^1.17.17",
     "@types/node": "^25.6.2",
     "@types/ws": "^8.18.1",
     "tsup": "^8.5.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   }
 }

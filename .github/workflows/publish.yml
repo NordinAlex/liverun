@@ -1,0 +1,162 @@
+# Publish to npm when src/ changes are pushed to main
+name: Publish to npm
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "src/**"
+      - "package.json"
+
+  # Allows manual trigger from the Actions tab
+  workflow_dispatch:
+
+# Prevent concurrent publish runs
+concurrency:
+  group: "npm-publish"
+  cancel-in-progress: false
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Job 1 – Build & validate
+  # ──────────────────────────────────────────────
+  build:
+    name: Build & Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Verify dist output exists
+        run: test -d dist && echo "✓ dist/ exists" || (echo "✗ dist/ missing" && exit 1)
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # ──────────────────────────────────────────────
+  # Job 2 – Run tests
+  # ──────────────────────────────────────────────
+  test:
+    name: Test
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  # ──────────────────────────────────────────────
+  # Job 3 – Publish to npm (protected environment)
+  # ──────────────────────────────────────────────
+  publish:
+    name: Publish to npm
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    environment: npm-publish
+
+    permissions:
+      contents: write
+      id-token: write # Required for npm provenance
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump patch version
+        id: version
+        run: |
+          npm version patch -m "chore: release v%s [skip ci]"
+          echo "tag=v$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Push version bump
+        run: git push --follow-tags
+
+  # ──────────────────────────────────────────────
+  # Job 4 – Create GitHub Release
+  # ──────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: npm-publish
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main # Pull the version-bumped commit
+
+      - name: Get version from package.json
+        id: pkg
+        run: |
+          echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.pkg.outputs.version }}
+          name: v${{ steps.pkg.outputs.version }}
+          generate_release_notes: true
+          body: |
+            ## Install / Update
+
+            ```bash
+            npx liverun@${{ steps.pkg.outputs.version }} server.js
+            ```

@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-import '../utils/suppress-warnings';
 
 import { program } from 'commander';
 import path from 'path';
 import fs from 'fs';
 import net from 'net';
 import readline from 'readline';
-import { startProxy } from '../core/proxy';
-import { startWatcher } from '../core/watcher';
-import { startRunner } from '../core/runner';
-import { logger } from '../utils/logger';
+import { startProxy } from '../core/proxy.js';
+import { startWatcher } from '../core/watcher.js';
+import { startRunner } from '../core/runner.js';
+import { logger } from '../utils/logger.js';
+import type { CliOptions } from '../types/index.js';
 
 program
   .version('0.5.2')
@@ -17,7 +17,7 @@ program
   .option('-p, --port <number>', 'Port for the live-dev proxy to listen on')
   .option('-s, --watch-server <directories>', 'Comma separated directories to watch for server restart', '.,src,routes,models,controllers')
   .option('-c, --watch-client <directories>', 'Comma separated directories to watch for client refresh', 'public,views')
-  .action(async (script: string, options: any) => {
+  .action(async (script: string, options: CliOptions) => {
     const targetScript = path.resolve(process.cwd(), script);
     const targetDir = path.dirname(targetScript);
 
