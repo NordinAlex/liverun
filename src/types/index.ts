@@ -9,6 +9,7 @@ export interface RunnerOptions {
   port: number;
   onReady: () => void;
   onCrash: () => void;
+  onPortDetected?: (port: number) => void;
 }
 
 export interface WatcherOptions {

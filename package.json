@@ -7,8 +7,8 @@
     "url": "https://alexnordin.dev"
   },
   "publishConfig": {
-  "access": "public"
-},
+    "access": "public"
+  },
   "license": "MIT",
   "homepage": "https://nordinalex.github.io/liverun",
   "repository": {
