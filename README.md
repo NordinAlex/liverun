@@ -6,9 +6,9 @@
 
 **LIVE CODE. RUN INSTANTLY.**
 
-[![npm version](https://badge.fury.io/js/liverun.svg)](https://badge.fury.io/js/liverun)
+[![npm version](https://img.shields.io/npm/v/liverun.svg)](https://npmjs.org/package/liverun)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/NordinAlex/liverun/actions/workflows/publish.yml/badge.svg)](https://github.com/NordinAlex/liverun/actions/workflows/publish.yml)
+[![CI](https://github.com/NordinAlex/liverun/actions/workflows/publish.yml/badge.svg)](https://github.com/NordinAlex/liverun)
 
 A **zero-configuration** hot reloading tool designed to supercharge your Express.js and Node.js development.
 
