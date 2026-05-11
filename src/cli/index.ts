@@ -117,12 +117,12 @@ async function promptForAlternativePort(requestedPort: number): Promise<number> 
  * Build watch directory lists from a comma-separated string.
  * Includes paths relative to both cwd and the target script's directory.
  */
-function buildWatchDirs(dirsString: string, targetDir: string): string[] {
-  const dirs = dirsString.split(',').map(s => s.trim()).filter(Boolean);
-  return Array.from(new Set([
-    ...dirs,
-    ...dirs.map(d => path.resolve(targetDir, d)),
-  ]));
+function buildWatchDirs(dirsString: string): string[] {
+  return dirsString
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(d => path.resolve(process.cwd(), d));
 }
 
 // -------------------------------------------------------------------
@@ -133,8 +133,8 @@ program
   .version('0.5.2')
   .argument('<script>', 'The express server script to run (e.g. server.js)')
   .option('-p, --port <number>', 'Port for the live-dev proxy to listen on')
-  .option('-s, --watch-server <directories>', 'Comma separated directories to watch for server restart', '.,src,bin,routes,models,controllers')
-  .option('-c, --watch-client <directories>', 'Comma separated directories to watch for client refresh', 'public,views')
+  .option('-s, --watch-server <directories>', 'Comma separated directories to watch for server restart', '.')
+  .option('-c, --watch-client <directories>', 'Comma separated directories to watch for client refresh', '.')
   .action(async (script: string, options: CliOptions) => {
     const targetScript = resolveScript(script);
     const targetDir = path.dirname(targetScript);
@@ -188,8 +188,8 @@ program
     let clientDebounce: NodeJS.Timeout | null = null;
 
     const watcher = startWatcher({
-      serverWatch: buildWatchDirs(options.watchServer, targetDir),
-      clientWatch: buildWatchDirs(options.watchClient, targetDir),
+      serverWatch: buildWatchDirs(options.watchServer),
+      clientWatch: buildWatchDirs(options.watchClient),
       onServerChange: (filePath: string) => {
         if (serverDebounce) clearTimeout(serverDebounce);
         serverDebounce = setTimeout(() => {
